@@ -60,6 +60,8 @@ export function createWorld3D(canvas) {
   let timeOfDay = 12; // Hour of day, 0–24.
   let nightFactor = 0; // 0 = full day, 1 = full night.
   let followTarget = null; // {x, z, cameraYaw, cameraPitch} — third-person follow.
+  const smoothCamPos = new THREE.Vector3(0, CAMERA_HEIGHT, -CAMERA_DISTANCE);
+  let camSmoothed = false;
 
   function resize() {
     const width = canvas.clientWidth || window.innerWidth;
@@ -119,7 +121,17 @@ export function createWorld3D(canvas) {
       // Camera sits opposite the view direction from the player.
       const cx = followTarget.x - Math.sin(yaw) * dist;
       const cz = followTarget.z - Math.cos(yaw) * dist;
-      camera.position.set(cx, height, cz);
+      // Smooth follow: snap on the first frame, then damp so turns and sprints
+      // don't whip the camera.
+      if (!camSmoothed) {
+        smoothCamPos.set(cx, height, cz);
+        camSmoothed = true;
+      } else {
+        smoothCamPos.x = THREE.MathUtils.damp(smoothCamPos.x, cx, 8, dt);
+        smoothCamPos.y = THREE.MathUtils.damp(smoothCamPos.y, height, 8, dt);
+        smoothCamPos.z = THREE.MathUtils.damp(smoothCamPos.z, cz, 8, dt);
+      }
+      camera.position.copy(smoothCamPos);
       camera.lookAt(followTarget.x, 1.6, followTarget.z);
     }
     renderer.render(scene, camera);

@@ -181,8 +181,13 @@ export function createPlayer(scene, city) {
       mz /= mag;
     }
     const targetSpeed = mag > 0 ? (run ? RUN_SPEED : WALK_SPEED) : 0;
-    state.speed = THREE.MathUtils.damp(state.speed, targetSpeed, ACCEL / Math.max(targetSpeed, 1) * 0.35 + 2.2, dt);
-    if (state.speed < 0.05 && targetSpeed === 0) state.speed = 0;
+    // Accelerate toward the target speed; stop quicker than starting (responsive halt).
+    const rate = targetSpeed > state.speed ? ACCEL : ACCEL * 1.6;
+    state.speed = THREE.MathUtils.clamp(
+      state.speed + Math.sign(targetSpeed - state.speed) * rate * dt,
+      0, Math.max(state.speed, targetSpeed),
+    );
+    if (targetSpeed === 0 && state.speed < 0.05) state.speed = 0;
     tryMove(state.x + mx * state.speed * dt, state.z + mz * state.speed * dt);
 
     // Face the movement direction; when standing still, face the camera forward.
