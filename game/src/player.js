@@ -276,6 +276,30 @@ export function createPlayer(scene, city) {
     };
   }
 
+  // Full reset for a new game / respawn: health, position, on foot, unarmed.
+  function reset(x, z) {
+    state.x = x;
+    state.z = z;
+    state.y = 0;
+    state.heading = 0;
+    state.speed = 0;
+    state.health = 100;
+    state.onFoot = true;
+    state.car = null;
+    cameraYaw = 0;
+    state.cameraPitch = 0.35;
+    vy = 0;
+    grounded = true;
+    armed = false;
+    invulnerable = 0;
+    punchTimer = 0;
+    shootTimer = 0;
+    mesh.visible = true;
+    shadow.visible = true;
+    mesh.userData.pistol.visible = false;
+    syncMesh();
+  }
+
   syncMesh();
 
   return {
@@ -296,6 +320,7 @@ export function createPlayer(scene, city) {
     update,
     takeDamage,
     setPosition,
+    reset,
     getState,
   };
 }

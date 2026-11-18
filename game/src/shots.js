@@ -1,79 +1,73 @@
-// The screenshot scenes behind ?shot=start|play|end. Each one plays the real rules forward from a
-// fresh world for a fixed number of steps, steered by a simple autopilot (look ahead each way the
-// paddle could move, keep clear of blocks, chase the lowest coin when that is safe), so the frame
-// is what a short game really looks like and the same seed always gives the same frame.
-import { FIELD, PLAYER, STEP } from './config.js';
-import { EVENT_OVER, KIND_BLOCK } from './world.js';
-import { SCREEN_OVER, SCREEN_PLAY, SCREEN_TITLE } from './render.js';
+// shots.js — Staged screenshot scenes for ?shot=start|drive|chase|night.
+// Each scene sets the world up deterministically from the seeded game object
+// main.js built: player and car positions, wanted level, time of day, and which
+// screen is showing. main.js paints the staged frame twice and then sets
+// window.__shotReady, so the capture always sees the finished frame.
+import { STEP } from './config.js';
 
-const START_SECONDS = 5;
-const PLAY_SECONDS = 26;
-const END_LIMIT_SECONDS = 600;
-/**
- * How far ahead, in seconds, the autopilot checks each way it could move: the play scene's pilot
- * looks well ahead and keeps all its lives; the end scene's looks only a moment ahead, so it is
- * caught out once the blocks speed up, as a hurried player is.
- */
-const HORIZON_PLAY = 0.7;
-const HORIZON_END = 0.25;
-const SAMPLE = 1 / 30;
-const DIRECTIONS = [0, -1, 1];
-/** Extra room, each side, it keeps between the paddle and a block. */
-const MARGIN = 10;
-
-/** Seconds until moving in `direction` (-1, 0, 1) runs the paddle into a block; Infinity when it never does. */
-function timeToHit(state, direction, horizon) {
-  const player = state.player;
-  for (let t = SAMPLE; t <= horizon; t += SAMPLE) {
-    const x = Math.min(FIELD.width - player.width, Math.max(0, player.x + direction * PLAYER.speed * t));
-    for (let index = 0; index < state.items.length; index += 1) {
-      const item = state.items[index];
-      if (!item.active || item.kind !== KIND_BLOCK) continue;
-      const y = item.y + item.speed * t;
-      if (y + item.height > player.y && y < player.y + player.height && item.x < x + player.width + MARGIN && item.x + item.width > x - MARGIN) return t;
-    }
+// Step traffic + police forward so staged cars and cop cars sit mid-action
+// instead of frozen at their spawn points.
+function settle(game, seconds) {
+  const steps = Math.round(seconds / STEP);
+  for (let i = 0; i < steps; i += 1) {
+    game.traffic.update(STEP, { x: game.player.x, z: game.player.z }, game.player.car || null);
+    game.police.update(STEP, game.player, game.traffic.cars);
   }
-  return Infinity;
 }
 
-/** Of the safe ways to move, the one toward the lowest coin (or the centre); else the one that is hit last. */
-function autopilot(state, horizon) {
-  const player = state.player;
-  let coin = null;
-  for (let index = 0; index < state.items.length; index += 1) {
-    const item = state.items[index];
-    if (item.active && item.kind !== KIND_BLOCK && (coin === null || item.y > coin.y)) coin = item;
-  }
-  const target = coin === null ? FIELD.width / 2 : coin.x + coin.width / 2;
-  const centre = player.x + player.width / 2;
-  const wanted = target > centre + 8 ? 1 : target < centre - 8 ? -1 : 0;
-  let best = wanted;
-  let bestTime = timeToHit(state, wanted, horizon);
-  for (let index = 0; index < DIRECTIONS.length && bestTime !== Infinity; index += 1) {
-    const time = timeToHit(state, DIRECTIONS[index], horizon);
-    if (time > bestTime) {
-      bestTime = time;
-      best = DIRECTIONS[index];
-    }
-  }
-  return best;
-}
+export function stageShot(name, game) {
+  const shot = name || 'start';
+  const player = game.player;
+  const police = game.police;
 
-/**
- * Set `world` to the named scene (start, play or end; any other name is start) and return the
- * screen to draw over it and the best score to show.
- */
-export function stageShot(name, world) {
-  world.reset();
-  if (name !== 'play' && name !== 'end') {
-    for (let index = 0; index < START_SECONDS / STEP; index += 1) world.step(STEP, 0, true);
-    return { screen: SCREEN_TITLE, best: 0 };
+  // A clean slate for every shot: no wanted level, no mission, no marker.
+  police.reset();
+  game.clearMarker();
+  game.setObjective('');
+  if (game.hud) game.hud.setMission('');
+
+  if (shot === 'drive') {
+    // Daytime driving through downtown: Danny in a red muscle car on the
+    // main east-west avenue, heading south, camera behind the car.
+    game.setClock(13.5);
+    game.putPlayerInCar('muscle', 0, 0, 0);
+    settle(game, 1.5);
+    game.setScreen('playing');
+    game.setObjective('Free roam — Solmara is yours');
+    return;
   }
-  const limit = name === 'end' ? END_LIMIT_SECONDS : PLAY_SECONDS;
-  const horizon = name === 'end' ? HORIZON_END : HORIZON_PLAY;
-  for (let index = 0; index < limit / STEP; index += 1) {
-    if (world.step(STEP, autopilot(world.state, horizon), false) & EVENT_OVER) break;
+
+  if (shot === 'chase') {
+    // Police chase at dusk: 3 stars, two cop cars closing in behind Danny's
+    // sedan on the avenue, sun low.
+    game.setClock(18.4);
+    game.putPlayerInCar('sedan', 0, 52, 0);
+    police.addWanted(3);
+    // Let the pursuit close in so the cop cars are visible behind the player.
+    settle(game, 4);
+    game.setScreen('playing');
+    game.setObjective('Lose the cops — 3 stars');
+    game.showMessage('The cops are on you — lose them!');
+    return;
   }
-  const over = world.state.lives === 0;
-  return { screen: over ? SCREEN_OVER : SCREEN_PLAY, best: world.state.score };
+
+  if (shot === 'night') {
+    // Night neon: Danny on foot downtown under the signs, mission complete.
+    game.setClock(22.0);
+    player.onFoot = true;
+    player.car = null;
+    player.setPosition(0, 52);
+    player.cameraYaw = 0;
+    game.setScreen('playing');
+    game.showMissionComplete('First Wheels', 200);
+    return;
+  }
+
+  // Default: 'start' — the title screen over a quiet daytime city.
+  game.setClock(11.0);
+  player.onFoot = true;
+  player.car = null;
+  player.setPosition(0, 26);
+  player.cameraYaw = 0;
+  game.setScreen('title');
 }

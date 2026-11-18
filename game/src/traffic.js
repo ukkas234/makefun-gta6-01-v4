@@ -249,5 +249,14 @@ export function createTraffic(scene, city, count) {
     return best;
   }
 
-  return { cars: cars.map((e) => e.car), update, nearestCar };
+  // Pull a car out of ambient traffic (player stole it / shot the driver out).
+  // The mesh stays in the scene; the caller owns the car from here on.
+  function takeCar(car) {
+    const i = cars.findIndex((entry) => entry.car === car);
+    if (i < 0) return false;
+    cars.splice(i, 1);
+    return true;
+  }
+
+  return { cars: cars.map((e) => e.car), update, nearestCar, takeCar };
 }

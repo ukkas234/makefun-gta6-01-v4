@@ -328,6 +328,14 @@ export function createMissionManager(game) {
     }
   }
 
+  function abort() {
+    if (!active) return;
+    active = null;
+    game.clearMarker();
+    if (game.hud && typeof game.hud.setMission === 'function') game.hud.setMission('');
+    game.setObjective('Free roam — open Missions from the pause menu');
+  }
+
   function update(dt) {
     updatePackages();
     if (!active) return;
@@ -349,6 +357,7 @@ export function createMissionManager(game) {
     },
     start,
     update,
+    abort,
     available,
   };
 }

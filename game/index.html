@@ -3,16 +3,115 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Block Dodger</title>
-<style>
-  html, body { margin: 0; height: 100%; overflow: hidden; background: #11141b; }
-  #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
-  /* Read aloud, never shown: the status line screen readers announce. */
-  #status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-</style>
+<title>Solmara — Open-World Crime Sandbox</title>
+<link rel="stylesheet" href="./style.css">
 </head>
 <body>
-<canvas id="game" aria-label="Block Dodger: move the paddle left and right to dodge falling blocks and catch coins"></canvas>
+<canvas id="game" aria-label="Solmara: open-world crime sandbox. Drive, steal cars, dodge the police, run missions."></canvas>
+
+<!-- In-game HUD (built by hud.js). -->
+<div id="hud" style="display:none"></div>
+
+<!-- Title screen. -->
+<div id="screen-title" class="screen">
+  <div class="panel title-panel">
+    <h1>SOLMARA</h1>
+    <p class="tagline">Open-world crime sandbox &middot; Danny Reyes</p>
+    <div class="menu">
+      <button id="btn-new" type="button">New Game</button>
+      <button id="btn-continue" type="button">Continue</button>
+      <button id="btn-missions-title" type="button">Missions</button>
+      <button id="btn-controls-title" type="button">Controls</button>
+      <button id="btn-mute-title" type="button">Sound: On</button>
+    </div>
+    <p class="hint">Steal a car. Lose the heat. Own the city.</p>
+  </div>
+</div>
+
+<!-- Pause screen. -->
+<div id="screen-pause" class="screen" style="display:none">
+  <div class="panel">
+    <h2>PAUSED</h2>
+    <div class="menu">
+      <button id="btn-resume" type="button">Resume</button>
+      <button id="btn-missions-pause" type="button">Missions</button>
+      <button id="btn-controls-pause" type="button">Controls</button>
+      <button id="btn-mute-pause" type="button">Sound: On</button>
+      <button id="btn-quit" type="button">Quit to Title</button>
+    </div>
+  </div>
+</div>
+
+<!-- Missions list (opened from title or pause). -->
+<div id="screen-missions" class="screen" style="display:none">
+  <div class="panel">
+    <h2>MISSIONS</h2>
+    <div id="mission-list" class="menu"></div>
+    <div class="menu">
+      <button id="btn-missions-back" type="button">Back</button>
+    </div>
+  </div>
+</div>
+
+<!-- Controls reference. -->
+<div id="screen-controls" class="screen" style="display:none">
+  <div class="panel">
+    <h2>CONTROLS</h2>
+    <table class="controls-table">
+      <tr><td>W A S D / Arrows</td><td>Move / drive</td></tr>
+      <tr><td>Mouse drag</td><td>Orbit camera</td></tr>
+      <tr><td>Shift</td><td>Run (on foot) / handbrake (in car)</td></tr>
+      <tr><td>Space</td><td>Jump (on foot) / handbrake (in car)</td></tr>
+      <tr><td>E</td><td>Enter / exit / steal car</td></tr>
+      <tr><td>R</td><td>Flip / reset car</td></tr>
+      <tr><td>F / Left click</td><td>Punch</td></tr>
+      <tr><td>Q</td><td>Draw / holster pistol</td></tr>
+      <tr><td>Left click (armed)</td><td>Shoot</td></tr>
+      <tr><td>Esc / P</td><td>Pause</td></tr>
+      <tr><td>M</td><td>Mute</td></tr>
+    </table>
+    <div class="menu">
+      <button id="btn-controls-back" type="button">Back</button>
+    </div>
+  </div>
+</div>
+
+<!-- Busted / wasted overlay. -->
+<div id="screen-busted" class="screen overlay-red" style="display:none">
+  <div class="panel">
+    <h2 id="busted-title">BUSTED</h2>
+    <p id="busted-text">The Solmara PD caught you. Fine: $100.</p>
+    <div class="menu">
+      <button id="btn-busted-ok" type="button">Continue</button>
+    </div>
+  </div>
+</div>
+
+<!-- Mission complete overlay. -->
+<div id="screen-mission-done" class="screen" style="display:none">
+  <div class="panel">
+    <h2>MISSION COMPLETE</h2>
+    <p id="mission-done-title">First Wheels</p>
+    <p id="mission-done-reward">+$200</p>
+    <div class="menu">
+      <button id="btn-mission-done-ok" type="button">Continue</button>
+    </div>
+  </div>
+</div>
+
+<!-- Story complete screen. -->
+<div id="screen-story" class="screen" style="display:none">
+  <div class="panel">
+    <h2>STORY COMPLETE</h2>
+    <p>Solmara is yours, Danny.</p>
+    <p class="hint">All five missions done. Free roam stays open.</p>
+    <div class="menu">
+      <button id="btn-story-roam" type="button">Keep Playing (Free Roam)</button>
+      <button id="btn-story-title" type="button">Back to Title</button>
+    </div>
+  </div>
+</div>
+
 <p id="status" role="status" aria-live="polite"></p>
 <script type="module" src="./src/main.js"></script>
 </body>
