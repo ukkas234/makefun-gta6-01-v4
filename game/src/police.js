@@ -71,18 +71,23 @@ export function createPolice(scene, city) {
   let decayTimer = 0;
   let bustTimer = 0;
   let ramWantedCooldown = 0;
+  let clock = 0; // drives the red/blue light-bar flash
   let sirenOn = false;
   const cars = []; // police cars {car}
   const footCops = []; // on-foot cops
   const scratch = { x: 0, z: 0 };
 
-  function roadPointNear(px, pz, distance) {
-    // Pick a road point roughly `distance` away from the player, in a random
-    // direction, snapped onto the nearest road when the city offers it.
+  function roadPointNear(px, pz, distance, preferAngle) {
+    // Pick a road point roughly `distance` away from the player, snapped onto
+    // the nearest road when the city offers it. With a preferred angle the
+    // point lands in that direction (spread ±35°) instead of anywhere.
     for (let attempt = 0; attempt < 8; attempt += 1) {
-      const a = Math.random() * Math.PI * 2;
-      const x = px + Math.cos(a) * distance;
-      const z = pz + Math.sin(a) * distance;
+      const a = Number.isFinite(preferAngle)
+        ? preferAngle + (Math.random() - 0.5) * 1.2
+        : Math.random() * Math.PI * 2;
+      // Same angle convention as headings: forward is (sin a, cos a).
+      const x = px + Math.sin(a) * distance;
+      const z = pz + Math.cos(a) * distance;
       if (city && typeof city.nearestRoadPoint === 'function') {
         const p = city.nearestRoadPoint(x, z);
         if (p && Number.isFinite(p.x) && Number.isFinite(p.z)) return { x: p.x, z: p.z };
@@ -96,11 +101,38 @@ export function createPolice(scene, city) {
     return { x: px + distance, z: pz };
   }
 
-  function spawnCar(px, pz) {
-    const at = roadPointNear(px, pz, SPAWN_DISTANCE);
+  function addLightBar(car) {
+    // Roof light bar: red left, blue right, alternating flash.
+    const red = new THREE.Mesh(
+      new THREE.BoxGeometry(0.34, 0.12, 0.2),
+      new THREE.MeshLambertMaterial({ color: 0x881111, emissive: 0xff2222, emissiveIntensity: 1 }),
+    );
+    red.position.set(-0.2, 1.02, 0);
+    const blue = new THREE.Mesh(
+      new THREE.BoxGeometry(0.34, 0.12, 0.2),
+      new THREE.MeshLambertMaterial({ color: 0x111188, emissive: 0x2244ff, emissiveIntensity: 0.15 }),
+    );
+    blue.position.set(0.2, 1.02, 0);
+    car.mesh.add(red, blue);
+    car._lightRed = red;
+    car._lightBlue = blue;
+  }
+
+  // Cars spawn behind the player's direction of travel so they chase from
+  // behind instead of appearing in the player's path ahead.
+  function behindAngle(player) {
+    if (player && Number.isFinite(player.heading)) return player.heading + Math.PI;
+    return NaN;
+  }
+
+  function spawnCar(player) {
+    const at = roadPointNear(player.x, player.z, SPAWN_DISTANCE, behindAngle(player));
     const car = createCar('sedan', at.x, at.z, Math.random() * Math.PI * 2, { isPolice: true });
     car.speed = 0;
-    if (car.mesh) scene.add(car.mesh);
+    if (car.mesh) {
+      addLightBar(car);
+      scene.add(car.mesh);
+    }
     cars.push(car);
     return car;
   }
@@ -119,6 +151,46 @@ export function createPolice(scene, city) {
     if (car.mesh) scene.remove(car.mesh);
     const i = cars.indexOf(car);
     if (i >= 0) cars.splice(i, 1);
+  }
+
+  // Cops that fell far behind teleport back onto a road near the player
+  // instead of driving across the whole map; cops too close together
+  // separate so they stop stacking on one spot.
+  function repositionFarCops(player) {
+    for (const car of cars) {
+      if (dist2(car.x, car.z, player.x, player.z) > 220 * 220) {
+        const at = roadPointNear(player.x, player.z, SPAWN_DISTANCE, behindAngle(player));
+        car.x = at.x;
+        car.z = at.z;
+        car.speed = 0;
+        if (car.mesh) car.mesh.position.set(at.x, 0, at.z);
+      }
+    }
+    for (const cop of footCops) {
+      if (dist2(cop.x, cop.z, player.x, player.z) > 120 * 120) {
+        const at = roadPointNear(player.x, player.z, 28);
+        cop.x = at.x;
+        cop.z = at.z;
+        cop.mesh.position.set(at.x, 0, at.z);
+      }
+    }
+    for (let i = 0; i < cars.length; i += 1) {
+      for (let j = i + 1; j < cars.length; j += 1) {
+        const a = cars[i];
+        const b = cars[j];
+        const d2 = dist2(a.x, a.z, b.x, b.z);
+        if (d2 < 25 && d2 > 0.01) {
+          const d = Math.sqrt(d2);
+          const push = (5 - d) / 2;
+          const nx = (b.x - a.x) / d;
+          const nz = (b.z - a.z) / d;
+          a.x -= nx * push;
+          a.z -= nz * push;
+          b.x += nx * push;
+          b.z += nz * push;
+        }
+      }
+    }
   }
 
   function removeFootCop(cop) {
@@ -221,9 +293,10 @@ export function createPolice(scene, city) {
   }
 
   function update(dt, player, trafficCars) {
+    clock += dt;
     // Keep the force matched to the wanted level.
     const wantCars = desiredCars();
-    while (cars.length < wantCars) spawnCar(player.x, player.z);
+    while (cars.length < wantCars) spawnCar(player);
     while (cars.length > wantCars) removeCar(cars[cars.length - 1]);
     const wantFoot = desiredFootCops(player.onFoot);
     while (footCops.length < wantFoot) spawnFootCop(player.x, player.z);
@@ -246,6 +319,15 @@ export function createPolice(scene, city) {
 
     for (const car of cars) updateCar(car, dt, player);
     for (const cop of footCops) updateFootCop(cop, dt, player);
+    repositionFarCops(player);
+
+    // Alternate the light bar: red bright while blue dims, swapping ~4x/s.
+    const redPhase = Math.sin(clock * Math.PI * 8) > 0;
+    for (const car of cars) {
+      if (!car._lightRed || !car._lightBlue) continue;
+      car._lightRed.material.emissiveIntensity = redPhase ? 1.6 : 0.15;
+      car._lightBlue.material.emissiveIntensity = redPhase ? 0.15 : 1.6;
+    }
 
     // Busted: an on-foot cop within 2 m of an on-foot player for 2 s.
     let busted = false;
@@ -304,6 +386,7 @@ export function createPolice(scene, city) {
     decayTimer = 0;
     bustTimer = 0;
     ramWantedCooldown = 0;
+    clock = 0;
     sirenOn = false;
     while (cars.length > 0) removeCar(cars[0]);
     while (footCops.length > 0) removeFootCop(footCops[0]);
