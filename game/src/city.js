@@ -67,7 +67,6 @@ export function createCity(scene, rng) {
   }
 
   // ---- sidewalks + buildings, one block at a time ----
-  const sidewalk = sidewalkTexture();
   const blockCenters = [];
   for (let i = 0; i < CITY.blocks; i += 1) {
     blockCenters.push(-CITY.half + CITY.pitch / 2 + i * CITY.pitch);
@@ -76,12 +75,13 @@ export function createCity(scene, rng) {
   // Distance of a block centre from the city centre, 0..1 — downtown builds taller.
   const centrality = (bx, bz) => 1 - Math.max(Math.abs(bx), Math.abs(bz)) / CITY.half;
 
+  // One shared sidewalk material for all 100 blocks (was a clone per block).
+  const sidewalkMat = new THREE.MeshLambertMaterial({ map: sidewalkTexture() });
+  sidewalkMat.map.repeat.set(3, 3);
+
   for (const bx of blockCenters) {
     for (const bz of blockCenters) {
-      const walk = new THREE.MeshLambertMaterial({ map: sidewalk.clone() });
-      walk.map.repeat.set(3, 3);
-      walk.map.needsUpdate = true;
-      scene.add(plane(CITY.block + 4, CITY.block + 4, walk, bx, bz, 0.05));
+      scene.add(plane(CITY.block + 4, CITY.block + 4, sidewalkMat, bx, bz, 0.05));
 
       const count = rangeInt(rng, 1, 4);
       const tall = centrality(bx, bz);
