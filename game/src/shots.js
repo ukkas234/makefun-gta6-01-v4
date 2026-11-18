@@ -39,8 +39,9 @@ export function stageShot(name, game) {
 
   if (shot === 'chase') {
     // Police chase at dusk: 3 stars, two cop cars closing in behind Danny's
-    // sedan on the avenue, sun low.
-    game.setClock(18.4);
+    // sedan on the avenue, sun low. 17.2, not 18.4: past 18:00 the sun model
+    // is already full night (nightFactor 1), so 18.4 rendered pitch black.
+    game.setClock(17.2);
     game.putPlayerInCar('sedan', 0, 52, 0);
     police.addWanted(3);
     // Let the pursuit close in so the cop cars are visible behind the player.

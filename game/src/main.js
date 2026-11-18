@@ -725,6 +725,11 @@ function runShot(name) {
   stageShot(name, game);
   let painted = 0;
   function paint() {
+    // Sync the player first: without this the on-foot mesh stays visible while
+    // "driving" (update() hides it in a car) and the camera follows the stale
+    // on-foot position instead of the car. No keys are pressed in shot mode,
+    // so on-foot updates are a no-op beyond syncing the mesh.
+    player.update(STEP, input, city);
     world.setFollow(player.getState());
     world.update(STEP);
     hud.update(hudState());
