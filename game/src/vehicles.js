@@ -58,8 +58,9 @@ function makeHeadlightCone(side, zFront) {
     blending: THREE.AdditiveBlending,
   });
   const cone = new THREE.Mesh(geo, mat);
-  // ConeGeometry points +y; rotate so it points forward (+z) and slightly down.
-  cone.rotation.x = Math.PI / 2 + 0.12;
+  // ConeGeometry's apex is at +y; rotate so the apex sits at the car and the
+  // wide end faces forward (+z), tilted slightly down toward the road.
+  cone.rotation.x = -Math.PI / 2 - 0.12;
   cone.position.set(side, 0.55, zFront + 1.6);
   cone.visible = false;
   return cone;
@@ -136,10 +137,8 @@ export function createCarMesh(type, color) {
   // Headlights (front) and tail lights (rear). Headlight cones start hidden;
   // createCar() turns them on for the player / police car, render.js toggles
   // them with the day/night cycle.
-  const hl = new THREE.MeshLambertMaterial({ color: 0xfff6c8, emissive: 0xffedb0, emissiveIntensity: 0.9 });
   group.add(box(0.06, 0.16, 0.3, 0xffffff, L / 2 + 0.01, 0.62, W * 0.28, { emissive: 0xffedb0, emissiveIntensity: 0.9 }));
   group.add(box(0.06, 0.16, 0.3, 0xffffff, L / 2 + 0.01, 0.62, -W * 0.28, { emissive: 0xffedb0, emissiveIntensity: 0.9 }));
-  void hl;
   const tailMat = new THREE.MeshLambertMaterial({ color: 0x7a0d0d, emissive: 0xcc1111, emissiveIntensity: 0.8 });
   const tailL = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.16, 0.32), tailMat);
   tailL.position.set(-L / 2 - 0.01, 0.62, W * 0.28);

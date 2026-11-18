@@ -141,7 +141,7 @@ export function createTraffic(scene, city, count) {
   // Is there another car (traffic, or the player's car passed in as playerCar)
   // directly ahead of `entry` within LOOK_AHEAD metres? Uses the car's forward
   // axis, so cars in the next lane or behind do not block it.
-  function carAhead(entry, playerCar) {
+  function carAhead(entry, playerCar, playerPos) {
     const c = entry.car;
     const fx = Math.sin(c.heading);
     const fz = Math.cos(c.heading);
@@ -158,7 +158,13 @@ export function createTraffic(scene, city, count) {
       if (gap < nearest) nearest = gap;
     };
     for (const e of cars) check(e.car);
-    if (playerCar) check(playerCar);
+    if (playerCar) {
+      check(playerCar);
+    } else if (playerPos) {
+      // Player on foot in the road ahead: treat as a ~1 m obstacle so traffic
+      // brakes instead of driving through them.
+      check({ x: playerPos.x, z: playerPos.z, length: 1 });
+    }
     return nearest;
   }
 
@@ -195,7 +201,7 @@ export function createTraffic(scene, city, count) {
       if (d < 3.5) pickNext(entry);
 
       // Stop for the car ahead; creep forward again once the gap opens.
-      const gap = carAhead(entry, playerCar);
+      const gap = carAhead(entry, playerCar, playerPos);
       const wantStop = gap < STOP_GAP;
       if (wantStop) {
         entry.speed = Math.max(0, entry.speed - 22 * dt);
@@ -228,7 +234,6 @@ export function createTraffic(scene, city, count) {
       const spin = (entry.speed * dt) / 0.36;
       for (const w of wheels) w.rotation.x += spin;
     }
-    void playerPos; // reserved: callers may pass the player's position for future use
   }
 
   function nearestCar(x, z, maxDist) {
