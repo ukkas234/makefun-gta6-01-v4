@@ -216,6 +216,7 @@ const game = {
   },
 };
 const missions = createMissionManager(game);
+game.missions = missions;
 
 // ---------- screens ----------
 const screens = {
@@ -438,6 +439,7 @@ function exitCar(silent) {
   if (!city.collideCircle(px, pz, 0.5)) player.setPosition(px, pz);
   else player.setPosition(car.x, car.z);
   if (!looseCars.includes(car)) looseCars.push(car);
+  car.wasPlayerCar = true;
   if (!silent) hud.showMessage('Out of the car.');
 }
 function tryEnterExit() {
@@ -455,8 +457,9 @@ function tryEnterExit() {
     const i = looseCars.indexOf(car);
     if (i >= 0) looseCars.splice(i, 1);
     audio.click();
-    enterCar(car, wasTraffic || i < 0);
-    if (!wasTraffic && i >= 0) hud.showMessage('Back in your car.');
+    // Taking a car counts as stealing unless it is one the player drove before.
+    enterCar(car, wasTraffic || !car.wasPlayerCar);
+    if (!wasTraffic && car.wasPlayerCar) hud.showMessage('Back in your car.');
   } else {
     exitCar(false);
   }
@@ -702,6 +705,10 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden && screen === 'playing') pauseGame();
 });
 window.addEventListener('beforeunload', () => saveSave(save));
+
+// Debug handle for automated checks (movement, driving, missions) and for
+// diagnosing a live session; the game itself never reads it.
+window.__solmara = game;
 
 // ---------- boot ----------
 audio.setMuted(!!save.muted);
