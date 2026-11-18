@@ -9,7 +9,7 @@ export function createAudio() {
   let master = null;
   let noiseBuf = null;
   let mutedState = false;
-  let gestureHooked = false;
+  let gestureSeen = false;
 
   // Engine hum: two detuned sawtooths through a low-pass filter.
   let engineNodes = null; // {osc1, osc2, filter, gain}
@@ -21,10 +21,28 @@ export function createAudio() {
     return !!(window.AudioContext || window.webkitAudioContext);
   }
 
+  // Gesture listeners are hooked at creation time (not lazily): the
+  // game loop calls engine() every frame, and without this gate the
+  // first engine() call would create a *suspended* AudioContext before
+  // any user gesture. Instead we wait for a real gesture, then create
+  // (or resume) the context right away so a click() fired by that same
+  // user event already has audio.
+  function hookGesture() {
+    if (typeof window === "undefined") return;
+    const wake = () => {
+      gestureSeen = true;
+      if (ctx && ctx.state === "suspended") ctx.resume().catch(() => {});
+    };
+    window.addEventListener("pointerdown", wake, { passive: true });
+    window.addEventListener("keydown", wake);
+  }
+
+  hookGesture();
+
   // Create (or resume) the context. Returns null when unavailable or
-  // when the browser still refuses to start audio (no gesture yet).
+  // when no user gesture has happened yet (autoplay rule).
   function ensure() {
-    if (!audioAvailable()) return null;
+    if (!audioAvailable() || !gestureSeen) return null;
     if (!ctx) {
       const AC = window.AudioContext || window.webkitAudioContext;
       try {
@@ -41,25 +59,12 @@ export function createAudio() {
       noiseBuf = ctx.createBuffer(1, len, ctx.sampleRate);
       const data = noiseBuf.getChannelData(0);
       for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
-      hookGesture();
     }
     if (ctx.state === "suspended") {
       // resume() returns a promise; a rejection just means "not yet".
       ctx.resume().catch(() => {});
     }
     return ctx;
-  }
-
-  // Resume the context on the first real user gesture so sounds can
-  // start even if the first ensure() ran before any interaction.
-  function hookGesture() {
-    if (gestureHooked || typeof window === "undefined") return;
-    gestureHooked = true;
-    const wake = () => {
-      if (ctx && ctx.state === "suspended") ctx.resume().catch(() => {});
-    };
-    window.addEventListener("pointerdown", wake, { passive: true });
-    window.addEventListener("keydown", wake);
   }
 
   function now() {

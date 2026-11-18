@@ -65,6 +65,9 @@ export function loadSave() {
 }
 
 export function saveSave(data) {
+  // Refuse non-object input: normalize(null) would otherwise silently
+  // overwrite a good save with defaults.
+  if (!data || typeof data !== "object" || Array.isArray(data)) return false;
   if (!storageAvailable()) return false;
   try {
     localStorage.setItem(SAVE_KEY, JSON.stringify(normalize(data)));
